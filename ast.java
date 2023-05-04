@@ -462,6 +462,7 @@ class VarDeclNode extends DeclNode {
             Codegen.generate(".align 2");
             Codegen.generateLabeled("_" + myId.name(), ".space 4", "");
         }
+
     }
 
 
@@ -672,6 +673,9 @@ class FnDeclNode extends DeclNode {
         return label;
     }
 
+
+
+    public void codeGen(){
 //     # (1) Push the return addr
 //     sw	 $ra, 0($sp)
 //     subu $sp, $sp, 4
@@ -685,7 +689,6 @@ class FnDeclNode extends DeclNode {
 //   # (4) Push space for the locals
 //     subu $sp, $sp, <size of locals in bytes>
 
-    public void codeGen(){
         Codegen.generate(".text");
 
         if(myId.isMain()){
@@ -701,13 +704,18 @@ class FnDeclNode extends DeclNode {
         Codegen.genPush(Codegen.FP);
         int paramSize = ((FnSym)myId.sym()).getParamsSize();
 
-        Codegen.generate("addu", Codegen.FP, Codegen.SP,  8 + ( paramSize* 4 ));
-        Codegen.generate("subu", Codegen.SP, Codegen.SP, myId.sym().getOffset());
-        
+        Codegen.generate("addu", Codegen.FP, Codegen.SP, 8);
+        Codegen.generate("subu", Codegen.SP, Codegen.SP,  paramSize * 4); // size of locals
+//body
         Codegen.p.println();
-
+//body
         myBody.codeGen();
-        
+//exit
+// lw   $ra, 0($fp)      # load return address
+// move $t0, $fp         # FP holds the address to which we need to restore SP
+// lw   $fp, -4($fp)     # restore FP
+// move $sp, $t0         # restore SP
+// jr   $ra              # return  
         if (myId.isMain()){
             Codegen.genLabel("_main_Exit");
         }
@@ -1000,6 +1008,8 @@ class AssignStmtNode extends StmtNode {
         p.println(";");
     }
     public void codeGen(){
+        System.out.println("Assign codeGen");
+
         myAssign.codeGen();
         Codegen.genPop(Codegen.T0);
     }
@@ -1473,19 +1483,24 @@ class WriteStmtNode extends StmtNode {
         p.println(";");
     }
 
-
+    // Call the codeGen method of the expression being printed. That method will generate code to evaluate the expression, leaving that value on the top of the stack.
+    // Generate code to pop the top-of-stack value into register A0 (a special register used for output of strings and ints)
+    // Generate code to set register V0 to 1.
+    // Generate a syscall instruction.
     public void codeGen(){
+        System.out.println("write codeGen");
+
         myExp.codeGen(); 
-        // pop?
-        int param;
 
         if(myExp instanceof StringLitNode) {
-            param = 4;
-            Codegen.generate("li", Codegen.V0, param);
+            System.out.println("string");
+            Codegen.generate("li", Codegen.V0, 4);
+            Codegen.genPop(Codegen.A0);
         }
-        else {
-            param = 1;
-            Codegen.generate("li", Codegen.V0, param);
+        else{
+            System.out.println("int");
+            Codegen.generate("li", Codegen.V0, 1);
+            Codegen.genPop(Codegen.A0); //TODO: check 4
         }
 
         Codegen.generate("syscall");
@@ -1798,6 +1813,8 @@ class IdNode extends ExpNode {
         }
     }
     public void codeGen() {
+        System.out.println("IdNode codeGen");
+
         if(mySym.isGlobal()) {
             Codegen.generate("lw", Codegen.V0, "_" + myStrVal);
             Codegen.genPush(Codegen.V0);
@@ -1847,6 +1864,8 @@ class IntLitNode extends ExpNode {
         p.print(myIntVal);
     }
     public void codeGen(){
+        System.out.println("IntListNode codeGen");
+
         Codegen.generate("li", Codegen.V0, myIntVal); //TODO: Does this need to be a string
         Codegen.genPush(Codegen.V0);
     }
@@ -1891,16 +1910,20 @@ class StringLitNode extends ExpNode {
     }
 
     public void codeGen(){
+        System.out.println("StringLit Node codeGen");
+
         String label = Codegen.nextLabel();
         Codegen.generate(".data");
         Codegen.generateLabeled(label, ".asciiz", "", " " + myStrVal);
+        
         Codegen.generate(".text");
-
         Codegen.generate("la", Codegen.T0, label); //TODO: look into this
         Codegen.genPush(Codegen.T0);
-        Codegen.genPop(Codegen.A0);
-        Codegen.generate("li", Codegen.V0, "4");
+
+        // Codegen.genPop(Codegen.A0);
+        // Codegen.generate("li", Codegen.V0, "4");
     }
+
     private int myLineNum;
     private int myCharNum;
     private String myStrVal;
@@ -2125,8 +2148,8 @@ class AssignExpNode extends ExpNode {
     }
     public void codeGen(){
         myExp.codeGen();
-        Codegen.genPop(Codegen.V0);
 
+        Codegen.genPop(Codegen.V0);
         
         // handel lhs
         if( !( ((IdNode)myLhs).sym().isGlobal() ) ) {
@@ -2134,6 +2157,7 @@ class AssignExpNode extends ExpNode {
         } else {
             Codegen.generate("sw", Codegen.V0, "_" + ((IdNode)myLhs).name()); 
         }
+
     }       
     public void unparse(PrintWriter p, int indent) {
         if (indent != -1)  p.print("(");
@@ -2187,7 +2211,8 @@ class CallExpNode extends ExpNode {
 
     public void codeGen(){
         myExpList.codeGen();
-        Codegen.generate("jal", myId.name()); 
+        Codegen.generate("jal", "_"  + myId.name()); 
+        Codegen.genPush(Codegen.V0);
     }      
     /***
      * typeCheck
