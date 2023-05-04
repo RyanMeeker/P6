@@ -1560,12 +1560,30 @@ class ReturnStmtNode extends StmtNode {
         }
     }
 
+    //empty codegen for abstract - will use the one with param
     public void codeGen(){
-    //     if(myExp != null){
-    //         myExp.codeGen();
-    //     }
-    //     Codegen.generate("j", );
-    //     Codegen.p.println();
+
+    }
+
+    public void codeGen(String endFnLabel){
+        // Evaluate each actual param, pushing values onto stack
+        // jump to called function, leaving return address in the RA register
+        // push the returned value(either V0 or FO) onto stack
+
+        if(myExp != null && !myExp.typeCheck().isVoidType()){
+            myExp.codeGen();
+            Codegen.genPop(Codegen.V0);
+        }
+
+        Codegen.generate("b", endFnLabel);
+
+        // if(myExp instanceof StringLitNode){
+        //     Codegen.genPop(Codegen.V0);
+        // }
+        // else {
+        //     Codegen.genPop(Codegen.V0);
+        // }
+        
     }
 
     /***
@@ -1812,6 +1830,20 @@ class IdNode extends ExpNode {
             p.print("[" + mySym + "]");
         }
     }
+
+    //get address
+    // public void genAddr(){
+    //     if
+    // }
+
+    public void genJumpLink(){
+        if(myStrVal.equals("main")){
+            Codegen.generate("jal", myStrVal);
+        } else {
+            Codegen.generate("jal", "_" + myStrVal);
+        }
+    }
+
     public void codeGen() {
         System.out.println("IdNode codeGen");
 
@@ -2211,8 +2243,13 @@ class CallExpNode extends ExpNode {
 
     public void codeGen(){
         myExpList.codeGen();
-        Codegen.generate("jal", "_"  + myId.name()); 
-        Codegen.genPush(Codegen.V0);
+        // Codegen.generate("jal", "_"  + myId.name());
+        myId.genJumpLink();
+        if(!((FnSym)myId.sym()).getReturnType().isVoidType())
+        {
+            Codegen.genPush(Codegen.V0);
+        }   
+        
     }      
     /***
      * typeCheck
