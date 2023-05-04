@@ -1,5 +1,6 @@
 import java.io.*;
 import java.util.*;
+import java.util.jar.Attributes.Name;
 
 // **********************************************************************
 // The ASTnode class defines the nodes of the abstract-syntax tree that
@@ -105,6 +106,7 @@ import java.util.*;
 // **********************************************************************
 //   ASTnode class (base class for all other kinds of nodes)
 // **********************************************************************
+
 
 abstract class ASTnode { 
     // every subclass must provide an unparse operation
@@ -454,13 +456,14 @@ class VarDeclNode extends DeclNode {
     }
 
     public void codeGen() {
-        //TODO: Implement this method
-        if( myId.sym().isGlobal() == true ){
+        //TODO: possibly add offset
+        if(myId.sym().isGlobal()){
             Codegen.generate(".data");
             Codegen.generate(".align 2");
             Codegen.generateLabeled("_" + myId.name(), ".space 4", "");
         }
-    }   
+    }
+
 
     public Sym nameAnalysis(SymTab symTab, SymTab globalTab) {
         boolean badDecl = false;
@@ -664,36 +667,62 @@ class FnDeclNode extends DeclNode {
         myBody.unparse(p, indent+4);
         p.println("}\n");
     }
+
+    public String getLabel(){
+        return label;
+    }
+
+//     # (1) Push the return addr
+//     sw	 $ra, 0($sp)
+//     subu $sp, $sp, 4
+//   # (2) Push the control link
+//     sw   $fp, 0($sp)
+//     subu $sp, $sp, 4
+//   # (3) set the FP
+//   # Note: our convention for $sp is that it points to the first unused word of the stack.
+//   # The reason for adding 8 is that the unused word and the control link each take 4 bytes
+//     addu $fp, $sp, 8
+//   # (4) Push space for the locals
+//     subu $sp, $sp, <size of locals in bytes>
+
     public void codeGen(){
         Codegen.generate(".text");
-        if(myId.name().equals("main")){
+
+        if(myId.isMain()){
             Codegen.generate(".globl main");
             Codegen.genLabel("main");   
-            Codegen.genLabel("__start");
-        } else {
+            // Codegen.genLabel("__start");
+        } 
+        else {
             Codegen.genLabel("_" + myId.name());
         }
 
-
-        int offset = -myId.sym().getOffset();
         Codegen.genPush(Codegen.RA);
         Codegen.genPush(Codegen.FP);
-        Codegen.generate("addu", Codegen.FP, Codegen.SP, offset);
-        Codegen.p.println();
+        int paramSize = ((FnSym)myId.sym()).getParamsSize();
 
+        Codegen.generate("addu", Codegen.FP, Codegen.SP,  8 + ( paramSize* 4 ));
+        Codegen.generate("subu", Codegen.SP, Codegen.SP, myId.sym().getOffset());
+        
+        Codegen.p.println();
 
         myBody.codeGen();
         
+        if (myId.isMain()){
+            Codegen.genLabel("_main_Exit");
+        }
 
-        Codegen.genLabel("_" + myId.name() + "_exit");
-        Codegen.generateIndexed("lw", Codegen.RA, Codegen.FP, - myFormalsList.length() * 4);
+        Codegen.generateIndexed("lw", Codegen.RA, Codegen.FP, -(myFormalsList.length() * 4) );
 		Codegen.generate("move",  Codegen.T0, Codegen.FP);
-		Codegen.generateIndexed("lw", Codegen.FP, Codegen.FP, - myFormalsList.length() * 4 - 4);
+		Codegen.generateIndexed("lw", Codegen.FP, Codegen.FP, ( -(myFormalsList.length() * 4) - 4) );
 		Codegen.generate("move", Codegen.SP, Codegen.T0);
-		if(myId.name().equals("main")) {
+		
+        if(myId.name().equals("main")) {
 			Codegen.generate("li", Codegen.V0, "10");
 			Codegen.generate("syscall");
-		} else {
+		} 
+        else {
+            //push?
 			Codegen.generate("jr", Codegen.RA);
         }        
         Codegen.p.println();
@@ -703,6 +732,9 @@ class FnDeclNode extends DeclNode {
     private IdNode myId;
     private FormalsListNode myFormalsList;
     private FnBodyNode myBody;
+    private int off_set;
+    private int param;
+    String label;
 }
 
 class FormalDeclNode extends DeclNode {
@@ -1109,15 +1141,16 @@ class IfStmtNode extends StmtNode {
     }
     public void codeGen(){
         String label = Codegen.nextLabel();
-        String nextLabel = Codegen.nextLabel();
 
         myExp.codeGen();
+
         Codegen.genPop(Codegen.V0);
         Codegen.generate("li", Codegen.V1, "0");
         Codegen.generate("beq", Codegen.V0, Codegen.V1, label);
 
         myStmtList.codeGen();
-        Codegen.genLabel(nextLabel);
+
+        Codegen.genLabel(Codegen.nextLabel());
     }    
      /***
      * typeCheck
@@ -1393,7 +1426,6 @@ class ReadStmtNode extends StmtNode {
 }
 
 class WriteStmtNode extends StmtNode {
-
     public WriteStmtNode(ExpNode exp) {
         myExp = exp;
     }
@@ -1441,22 +1473,22 @@ class WriteStmtNode extends StmtNode {
         p.println(";");
     }
 
+
     public void codeGen(){
         myExp.codeGen(); 
+        // pop?
+        int param;
 
-        if (myType.isIntType() || myType.isBoolType()) {
-            Codegen.generate("li", Codegen.V0, "1");
-            Codegen.generate("syscall");
+        if(myExp instanceof StringLitNode) {
+            param = 4;
+            Codegen.generate("li", Codegen.V0, param);
         }
-        else if (myType.isStringType()) {
-            Codegen.generate("la", Codegen.T0, ((StringLitNode)myExp).getLabel()); //TODO: look into this
-            Codegen.genPush(Codegen.T0);
-            Codegen.genPop(Codegen.A0);
-            Codegen.generate("li", Codegen.V0, "4");
-            Codegen.generate("syscall");
+        else {
+            param = 1;
+            Codegen.generate("li", Codegen.V0, param);
         }
 
-        
+        Codegen.generate("syscall");
         Codegen.p.println();	
     }
 
@@ -1830,10 +1862,9 @@ class StringLitNode extends ExpNode {
         myStrVal = strVal;
     }
 
-    public String getLabel() {
-        return label;
+    public String name(){
+        return myStrVal;
     }
-
     /***
      * Return the line number for this literal.
      ***/
@@ -1858,15 +1889,21 @@ class StringLitNode extends ExpNode {
     public void unparse(PrintWriter p, int indent) {
         p.print(myStrVal);
     }
+
     public void codeGen(){
+        String label = Codegen.nextLabel();
         Codegen.generate(".data");
-        Codegen.generateLabeled(Codegen.nextLabel(), "ascliz", "", " " + myStrVal);
+        Codegen.generateLabeled(label, ".asciiz", "", " " + myStrVal);
         Codegen.generate(".text");
+
+        Codegen.generate("la", Codegen.T0, label); //TODO: look into this
+        Codegen.genPush(Codegen.T0);
+        Codegen.genPop(Codegen.A0);
+        Codegen.generate("li", Codegen.V0, "4");
     }
     private int myLineNum;
     private int myCharNum;
     private String myStrVal;
-    private String label;
 }
 
 class DotAccessExpNode extends ExpNode {
