@@ -61,7 +61,8 @@ public class P6 {
 		((ProgramNode)root.value).nameAnalysis();  // perform name analysis
 		
 		if (!ErrMsg.getErr()) {  // if no errors, do type checking
-			((ProgramNode)root.value).typeCheck();
+			// ((ProgramNode)root.value).typeCheck();
+            System.out.println("typecheck");
 		}
 		
 		if (!ErrMsg.getErr()) {  // if no errors, do code generation	
