@@ -1548,7 +1548,6 @@ class ReturnStmtNode extends StmtNode {
     public ReturnStmtNode(ExpNode exp) {
         myExp = exp;
     }
-    
     /***
      * nameAnalysis
      * Given a symbol table symTab, perform name analysis on this node's child,
@@ -1562,29 +1561,34 @@ class ReturnStmtNode extends StmtNode {
 
     //empty codegen for abstract - will use the one with param
     public void codeGen(){
-
-    }
-
-    public void codeGen(String endFnLabel){
-        // Evaluate each actual param, pushing values onto stack
-        // jump to called function, leaving return address in the RA register
-        // push the returned value(either V0 or FO) onto stack
-
         if(myExp != null && !myExp.typeCheck().isVoidType()){
             myExp.codeGen();
             Codegen.genPop(Codegen.V0);
         }
 
-        Codegen.generate("b", endFnLabel);
-
-        // if(myExp instanceof StringLitNode){
-        //     Codegen.genPop(Codegen.V0);
-        // }
-        // else {
-        //     Codegen.genPop(Codegen.V0);
-        // }
-        
+        Codegen.generate("b", fnName);
     }
+
+    // public void codeGen(String fnName){
+    //     // Evaluate each actual param, pushing values onto stack
+    //     // jump to called function, leaving return address in the RA register
+    //     // push the returned value(either V0 or FO) onto stack
+
+    //     if(myExp != null && !myExp.typeCheck().isVoidType()){
+    //         myExp.codeGen();
+    //         Codegen.genPop(Codegen.V0);
+    //     }
+
+    //     Codegen.generate("b", fnName);
+
+    //     // if(myExp instanceof StringLitNode){
+    //     //     Codegen.genPop(Codegen.V0);
+    //     // }
+    //     // else {
+    //     //     Codegen.genPop(Codegen.V0);
+    //     // }
+        
+    // }
 
     /***
      * typeCheck
@@ -2244,7 +2248,7 @@ class CallExpNode extends ExpNode {
     public void codeGen(){
         myExpList.codeGen();
         // Codegen.generate("jal", "_"  + myId.name());
-        myId.genJumpLink();
+        // myId.genJumpLink();
         if(!((FnSym)myId.sym()).getReturnType().isVoidType())
         {
             Codegen.genPush(Codegen.V0);
