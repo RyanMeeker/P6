@@ -1,0 +1,102 @@
+void testVoid(){
+  print <- "void func test";
+}
+
+//integer testRet(integer p){
+ // p--;
+ // print <- "p:";
+  //return p;
+//}
+
+void main() {
+ 
+   integer a;
+   integer b;
+   integer c;
+   integer d;
+   boolean g;
+   integer test;
+   
+  //assign tests 
+   a = 6;
+   b = 50;
+   c = 1;
+   d = 10;
+   g = false;
+
+//mult test
+a = a * 5;
+print <- a; //should be 30
+
+//division test
+b = b / 5;
+print <- b; //should be 10
+
+//addition test
+b = b + 15;
+print <- b; // should be 25
+
+//subtraction test
+a = a - 15;
+print <- a; //should be 15
+
+//Greater test
+if(a > 10){ //should be true
+  print <- "a is greater than 10. ";
+}
+
+//greaterEq test
+if(a >= 15){
+  print <- "a is >= 15. ";
+}
+
+//less test 
+if(a < 200){
+  print <- "a is less than 200. ";
+}
+
+//lesseq test
+if(a <= 15){
+  print <- "a is <= 15. ";
+}
+
+//if else test
+if(g == true){
+  print <- "g is true. ";
+} else {
+  print <- "g is false. " ; //this should get triggered
+}
+
+//and test 
+if(a==15 && b==25){
+  print <- "a==15 && b==25. ";
+}
+
+//or test 
+if(a==26 || b==25){
+  print <- "a!=26 but b==25. ";
+}
+
+//while, inc test
+while(c < 10){
+  c++;
+  print <- "c:";
+  print <- c;
+}
+
+//while, dec test
+while(d > 1){
+  d--;
+  print <- "d:";
+  print <- d;
+}
+
+//void call test
+testVoid();
+
+//return test 
+//test = testRet(10);
+//print <- "test:";
+//print <- test;
+
+}
